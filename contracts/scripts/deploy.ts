@@ -1,38 +1,30 @@
-import { ethers } from "ethers";
 import hre from "hardhat";
+import * as dotenv from "dotenv";
+dotenv.config();
 
 async function main() {
-  // Use the provider and signer configured by Hardhat
-  const provider = new ethers.JsonRpcProvider(
-    (hre.network.config as any).url
-  );
-  const privateKey = process.env.PRIVATE_KEY as string;
-  if (!privateKey) {
-    throw new Error("PRIVATE_KEY not set in .env");
-  }
-  const wallet = new ethers.Wallet(privateKey, provider);
-  console.log("Deploying with:", await wallet.getAddress());
+  const provider = hre.ethers.provider;
+
+  const deployer = new hre.ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+  console.log("Deploying with:", deployer.address);
 
   // 1) Deploy MockFXRP
-  const MockFXRP = await hre.ethers.getContractFactory("MockFXRP", wallet as any);
+  const MockFXRP = await hre.ethers.getContractFactory("MockFXRP", deployer);
   const mockFxrp = await MockFXRP.deploy();
   await mockFxrp.waitForDeployment();
   const mockFxrpAddress = await mockFxrp.getAddress();
   console.log("MockFXRP deployed at:", mockFxrpAddress);
 
   // 2) Deploy ReputationOracle
-  const ReputationOracle = await hre.ethers.getContractFactory("ReputationOracle", wallet as any);
+  const ReputationOracle = await hre.ethers.getContractFactory("ReputationOracle", deployer);
   const rep = await ReputationOracle.deploy();
   await rep.waitForDeployment();
   const repAddress = await rep.getAddress();
   console.log("ReputationOracle deployed at:", repAddress);
 
   // 3) Deploy FxrpLendingPool
-  const FxrpLendingPool = await hre.ethers.getContractFactory("FxrpLendingPool", wallet as any);
-  const pool = await FxrpLendingPool.deploy(
-    mockFxrpAddress,
-    repAddress
-  );
+  const FxrpLendingPool = await hre.ethers.getContractFactory("FxrpLendingPool", deployer);
+  const pool = await FxrpLendingPool.deploy(mockFxrpAddress, repAddress);
   await pool.waitForDeployment();
   const poolAddress = await pool.getAddress();
   console.log("FxrpLendingPool deployed at:", poolAddress);

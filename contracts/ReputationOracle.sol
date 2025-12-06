@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract ReputationOracle is Ownable {
     mapping(address => uint8) public score; // 0–100
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable() {}
 
     function setScore(address user, uint8 s) external onlyOwner {
         require(s <= 100, "score too high");
