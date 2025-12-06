@@ -11,20 +11,15 @@ import {
     trustWallet,
     ledgerWallet,
 } from '@rainbow-me/rainbowkit/wallets';
-import {
-    mainnet,
-    sepolia,
-    flare,
-
-} from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
+import { c2flr } from './lib/chains';
 
 const { wallets } = getDefaultWallets();
 
 const config = getDefaultConfig({
     appName: 'RippleLens AI',
-    projectId: 'YOUR_PROJECT_ID',
+    projectId: 'YOUR_PROJECT_ID', // WalletConnect project id, or temporary string
     wallets: [
         ...wallets,
         {
@@ -32,12 +27,7 @@ const config = getDefaultConfig({
             wallets: [argentWallet, trustWallet, ledgerWallet],
         },
     ],
-    chains: [
-        mainnet,
-        sepolia,
-        flare,
-
-    ],
+    chains: [c2flr],  // <-- only C2FLR here
     ssr: true,
 });
 
