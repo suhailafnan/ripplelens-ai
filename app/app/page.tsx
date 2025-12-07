@@ -18,6 +18,9 @@ const lendingAbi = lendingAbiJson as Abi;
 // collateral, debt, score, price, health
 type UserStateTuple = readonly [bigint, bigint, number, bigint, bigint];
 
+// price history for chart
+type PricePoint = { t: number; p: number };
+
 export default function Home() {
   const { address } = useAccount();
   const { writeContract, isPending } = useWriteContract();
@@ -111,6 +114,50 @@ export default function Home() {
     return Number(raw) / 1e18;
   }, [userState]);
 
+  // ======== chart + risk state ========
+  const [showChart, setShowChart] = useState(false);
+  const [prices, setPrices] = useState<PricePoint[]>([]);
+  const [riskLevel, setRiskLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('LOW');
+
+  useEffect(() => {
+    if (!showChart) return;
+    let interval: NodeJS.Timeout;
+
+    const fetchPrice = async () => {
+      try {
+        const res = await fetch('/api/fxrp-price');
+        const data = await res.json();
+        const point: PricePoint = {
+          t: data.timestamp * 1000,
+          p: data.price as number,
+        };
+
+        setPrices((prev) => {
+          const next = [...prev, point].slice(-50);
+          if (next.length >= 5) {
+            const ps = next.map((x) => x.p);
+            const min = Math.min(...ps);
+            const max = Math.max(...ps);
+            const mid = (min + max) / 2 || 1;
+            const vol = (max - min) / mid;
+            if (vol < 0.01) setRiskLevel('LOW');
+            else if (vol < 0.03) setRiskLevel('MEDIUM');
+            else setRiskLevel('HIGH');
+          }
+          return next;
+        });
+      } catch (e) {
+        console.error('price fetch error', e);
+      }
+    };
+
+    fetchPrice();
+    interval = setInterval(fetchPrice, 5000);
+
+    return () => clearInterval(interval);
+  }, [showChart]);
+
+  // ======== simple trading sim state (local only, MVP) ========
   const [side, setSide] = useState<'long' | 'short'>('long');
   const [sizeInput, setSizeInput] = useState('0');
   const [entryPrice, setEntryPrice] = useState<number | null>(null);
@@ -121,7 +168,8 @@ export default function Home() {
     !!address &&
     !isPending &&
     Number(sizeInput) > 0 &&
-    entryPrice === null;
+    entryPrice === null &&
+    riskLevel !== 'HIGH';
 
   const canClose = entryPrice !== null && !!address && !isPending;
 
@@ -151,6 +199,7 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-start py-8">
         <div className="max-w-5xl w-full px-4 grid md:grid-cols-2 gap-6">
+          {/* State panel */}
           <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6">
             <h2 className="text-xl font-semibold mb-2">
               Your FXRP position
@@ -222,6 +271,7 @@ export default function Home() {
             )}
           </div>
 
+          {/* Actions panel */}
           <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6">
             <h2 className="text-xl font-semibold mb-2">
               Quick actions
@@ -263,16 +313,72 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Trading panel (black) */}
         <div className="max-w-5xl w-full px-4 mt-8">
           <div className="bg-black text-white rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-semibold">
                 RippleLens A – Trading (MVP)
               </h2>
-              <span className="text-xs text-gray-400">
-                Simulated mockFXRP trades with on-chain price
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowChart((v) => !v)}
+                  className="px-3 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700"
+                >
+                  {showChart ? 'Hide chart' : 'Show chart'}
+                </button>
+                <span
+                  className={`px-2 py-1 rounded-full text-[10px] font-semibold ${riskLevel === 'LOW'
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : riskLevel === 'MEDIUM'
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : 'bg-rose-500/20 text-rose-300'
+                    }`}
+                >
+                  Risk: {riskLevel}
+                </span>
+              </div>
             </div>
+
+            {showChart && (
+              <div className="mb-4 border border-slate-800 rounded-xl p-3">
+                {prices.length < 2 ? (
+                  <p className="text-xs text-gray-400">
+                    Loading FXRP price feed…
+                  </p>
+                ) : (
+                  <svg viewBox="0 0 300 100" className="w-full h-32">
+                    <rect x="0" y="0" width="300" height="100" fill="#020617" />
+                    {(() => {
+                      const ps = prices;
+                      const min = Math.min(...ps.map((x) => x.p));
+                      const max = Math.max(...ps.map((x) => x.p));
+                      const range = max - min || 1;
+                      const path = ps
+                        .map((pt, i) => {
+                          const x = (i / (ps.length - 1)) * 300;
+                          const y = 100 - ((pt.p - min) / range) * 80 - 10;
+                          return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+                        })
+                        .join(' ');
+                      return (
+                        <path
+                          d={path}
+                          fill="none"
+                          stroke="#38bdf8"
+                          strokeWidth="2"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                        />
+                      );
+                    })()}
+                  </svg>
+                )}
+                <p className="mt-1 text-[10px] text-gray-500">
+                  FXRP price via oracle consumer; risk level based on recent volatility.
+                </p>
+              </div>
+            )}
 
             <div className="grid md:grid-cols-2 gap-4 text-sm">
               <div className="space-y-3">
