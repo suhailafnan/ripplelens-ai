@@ -25,10 +25,10 @@ export default function Home() {
   const { address } = useAccount();
   const { writeContract, isPending } = useWriteContract();
 
+  // --- 1. On-Chain Data Hooks ---
   const {
     data: fxrpBalance,
     status: balanceStatus,
-    error: balanceError,
   } = useReadContract({
     address: FXRP_TOKEN_ADDRESS as `0x${string}`,
     abi: fxrpAbi,
@@ -40,7 +40,6 @@ export default function Home() {
   const {
     data: userState,
     status: userStateStatus,
-    error: userStateError,
   } = useReadContract({
     address: LENDING_POOL_ADDRESS as `0x${string}`,
     abi: lendingAbi,
@@ -50,20 +49,14 @@ export default function Home() {
   }) as {
     data: UserStateTuple | undefined;
     status: 'idle' | 'pending' | 'success' | 'error';
-    error: any;
   };
-
-  useEffect(() => {
-    console.log('FXRP read:', { balanceStatus, fxrpBalance, balanceError });
-    console.log('UserState read:', { userStateStatus, userState, userStateError });
-  }, [balanceStatus, fxrpBalance, balanceError, userStateStatus, userState, userStateError]);
 
   const collateral = userState?.[0] ?? 0n;
   const debt = userState?.[1] ?? 0n;
   const score = userState?.[2] ?? 0;
-  const price = userState?.[3] ?? 0n;
   const health = userState?.[4] ?? 0n;
 
+  // --- 2. Action Functions ---
   function approve(amount: bigint) {
     if (!address) return;
     writeContract({
@@ -114,7 +107,7 @@ export default function Home() {
     return Number(raw) / 1e18;
   }, [userState]);
 
-  // ======== chart + risk state ========
+  // --- 3. Chart & Risk State ---
   const [showChart, setShowChart] = useState(false);
   const [prices, setPrices] = useState<PricePoint[]>([]);
   const [riskLevel, setRiskLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('LOW');
@@ -127,6 +120,7 @@ export default function Home() {
       try {
         const res = await fetch('/api/fxrp-price');
         const data = await res.json();
+        // Convert timestamp (seconds) to ms
         const point: PricePoint = {
           t: data.timestamp * 1000,
           p: data.price as number,
@@ -140,8 +134,8 @@ export default function Home() {
             const max = Math.max(...ps);
             const mid = (min + max) / 2 || 1;
             const vol = (max - min) / mid;
-            if (vol < 0.01) setRiskLevel('LOW');
-            else if (vol < 0.03) setRiskLevel('MEDIUM');
+            if (vol < 0.005) setRiskLevel('LOW');
+            else if (vol < 0.02) setRiskLevel('MEDIUM');
             else setRiskLevel('HIGH');
           }
           return next;
@@ -157,7 +151,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [showChart]);
 
-  // ======== simple trading sim state (local only, MVP) ========
+  // --- 4. Trading Sim State ---
   const [side, setSide] = useState<'long' | 'short'>('long');
   const [sizeInput, setSizeInput] = useState('0');
   const [entryPrice, setEntryPrice] = useState<number | null>(null);
@@ -199,9 +193,10 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-start py-8">
         <div className="max-w-5xl w-full px-4 grid md:grid-cols-2 gap-6">
-          {/* State panel */}
-          <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold mb-2">
+
+          {/* LEFT: User State Panel */}
+          <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6 shadow-lg">
+            <h2 className="text-xl font-semibold mb-2 text-slate-100">
               Your FXRP position
             </h2>
             {!address && (
@@ -210,280 +205,314 @@ export default function Home() {
               </p>
             )}
             {address && (
-              <div className="space-y-2 text-sm">
-                <p className="text-slate-400 break-all">
-                  Address:{' '}
-                  <span className="text-slate-200">{address}</span>
+              <div className="space-y-3 text-sm">
+                <p className="text-slate-400 break-all text-xs">
+                  Address: <span className="text-slate-200">{address}</span>
                 </p>
-                <p>
-                  FXRP wallet balance:{' '}
-                  <span className="text-sky-300">
-                    {balanceStatus === 'pending'
-                      ? '...'
-                      : fxrpBalance !== undefined
-                        ? format(fxrpBalance as bigint).toFixed(4)
-                        : '0.0000'}{' '}
-                    FXRP
-                  </span>
-                </p>
-                <p>
-                  Collateral in pool:{' '}
-                  <span className="text-emerald-300">
-                    {userStateStatus === 'pending'
-                      ? '...'
-                      : format(collateral).toFixed(4)}{' '}
-                    FXRP
-                  </span>
-                </p>
-                <p>
-                  Debt:{' '}
-                  <span className="text-rose-300">
-                    {userStateStatus === 'pending'
-                      ? '...'
-                      : format(debt).toFixed(4)}{' '}
-                    FXRP
-                  </span>
-                </p>
-                <p>
-                  Reputation score:{' '}
-                  <span className="text-amber-300">
-                    {userStateStatus === 'pending'
-                      ? '...'
-                      : Number(score)}
-                  </span>
-                </p>
-                <p>
-                  Health factor:{' '}
-                  <span className="text-sky-300">
-                    {health === 0n
-                      ? '∞'
-                      : (Number(health) / 1e18).toFixed(2)}
-                  </span>
-                </p>
-                <p className="text-xs text-slate-500">
-                  Price (FXRP/USD):{' '}
-                  {userStateStatus === 'pending'
-                    ? '...'
-                    : fxrpPrice.toFixed(4)}{' '}
-                  (on-chain)
-                </p>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase">Wallet Balance</p>
+                    <p className="text-sky-300 font-mono text-lg">
+                      {balanceStatus === 'pending'
+                        ? '...'
+                        : fxrpBalance !== undefined
+                          ? format(fxrpBalance as bigint).toFixed(2)
+                          : '0.00'}{' '}
+                      <span className="text-sm">FXRP</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase">Collateral</p>
+                    <p className="text-emerald-300 font-mono text-lg">
+                      {userStateStatus === 'pending'
+                        ? '...'
+                        : format(collateral).toFixed(2)}{' '}
+                      <span className="text-sm">FXRP</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase">Debt</p>
+                    <p className="text-rose-300 font-mono text-lg">
+                      {userStateStatus === 'pending'
+                        ? '...'
+                        : format(debt).toFixed(2)}{' '}
+                      <span className="text-sm">FXRP</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase">Health Factor</p>
+                    <p className={`font-mono text-lg ${health > 1500000000000000000n ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {health === 0n
+                        ? '∞'
+                        : (Number(health) / 1e18).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+                  <div>
+                    <span className="text-xs text-slate-500 mr-2">Reputation:</span>
+                    <span className="text-amber-300 font-bold">
+                      {userStateStatus === 'pending' ? '...' : Number(score)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500 mr-2">On-chain Price:</span>
+                    <span className="text-slate-200 font-mono">
+                      ${fxrpPrice.toFixed(4)}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Actions panel */}
-          <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold mb-2">
-              Quick actions
+          {/* RIGHT: Quick Actions Panel */}
+          <div className="border border-slate-800 bg-slate-900/70 rounded-2xl p-6 shadow-lg">
+            <h2 className="text-xl font-semibold mb-2 text-slate-100">
+              Lending Pool
             </h2>
-            <p className="text-sm text-slate-400 mb-4">
-              These buttons call the on-chain lending pool. In the full
-              RippleLens A version this panel will be AI-guided.
+            <p className="text-sm text-slate-400 mb-6">
+              Interact with FxrpLendingPool on Coston2.
             </p>
-            <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {/* Increased to 1000 FXRP for convenience as requested */}
               <button
-                onClick={() => approve(100n * oneFxrp)}
+                onClick={() => approve(1000n * oneFxrp)}
                 disabled={!address || isPending}
-                className="w-full rounded-lg bg-slate-800 hover:bg-slate-700 py-2 disabled:opacity-50"
+                className="col-span-2 rounded-lg bg-slate-800 hover:bg-slate-700 py-3 font-medium disabled:opacity-50 transition-colors text-slate-200"
               >
-                Approve 100 FXRP to pool
+                1. Approve 1000 FXRP
               </button>
               <button
                 onClick={() => deposit(100n * oneFxrp)}
                 disabled={!address || isPending}
-                className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 py-2 disabled:opacity-50"
+                className="rounded-lg bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-800 py-3 font-medium disabled:opacity-50 transition-colors"
               >
-                Deposit 100 FXRP
+                2. Deposit 100
               </button>
               <button
                 onClick={() => borrow(30n * oneFxrp)}
                 disabled={!address || isPending}
-                className="w-full rounded-lg bg-sky-600 hover:bg-sky-500 py-2 disabled:opacity-50"
+                className="rounded-lg bg-sky-900/30 hover:bg-sky-900/50 text-sky-400 border border-sky-800 py-3 font-medium disabled:opacity-50 transition-colors"
               >
-                Borrow 30 FXRP
+                3. Borrow 30
               </button>
               <button
                 onClick={() => repay(10n * oneFxrp)}
                 disabled={!address || isPending}
-                className="w-full rounded-lg bg-rose-600 hover:bg-rose-500 py-2 disabled:opacity-50"
+                className="col-span-2 rounded-lg bg-rose-900/30 hover:bg-rose-900/50 text-rose-400 border border-rose-800 py-3 font-medium disabled:opacity-50 transition-colors"
               >
-                Repay 10 FXRP
+                4. Repay 10 FXRP
               </button>
             </div>
           </div>
         </div>
 
-        {/* Trading panel (black) */}
-        <div className="max-w-5xl w-full px-4 mt-8">
-          <div className="bg-black text-white rounded-2xl p-6 space-y-4">
+        {/* BOTTOM: Trading Panel (Black) */}
+        <div className="max-w-5xl w-full px-4 mt-8 mb-12">
+          <div className="bg-black border border-slate-800 text-white rounded-2xl p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">
-                RippleLens A – Trading (MVP)
+              <h2 className="text-lg font-semibold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
+                RippleLens A – Active Trading
               </h2>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowChart((v) => !v)}
-                  className="px-3 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700"
+                  className="px-3 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-700 hover:bg-slate-800 transition-colors"
                 >
-                  {showChart ? 'Hide chart' : 'Show chart'}
+                  {showChart ? 'Hide Chart' : 'Show Chart'}
                 </button>
-                <span
-                  className={`px-2 py-1 rounded-full text-[10px] font-semibold ${riskLevel === 'LOW'
-                      ? 'bg-emerald-500/20 text-emerald-300'
+                <div
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${riskLevel === 'LOW'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                       : riskLevel === 'MEDIUM'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-rose-500/20 text-rose-300'
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                        : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                     }`}
                 >
+                  <div className={`w-2 h-2 rounded-full ${riskLevel === 'LOW' ? 'bg-emerald-400' : riskLevel === 'MEDIUM' ? 'bg-amber-400' : 'bg-rose-400'
+                    }`}></div>
                   Risk: {riskLevel}
-                </span>
+                </div>
               </div>
             </div>
 
+            {/* Enhanced Chart with Time & Min/Max */}
             {showChart && (
-              <div className="mb-4 border border-slate-800 rounded-xl p-3">
+              <div className="mb-4 border border-slate-800 rounded-xl p-4 bg-slate-900/30">
                 {prices.length < 2 ? (
-                  <p className="text-xs text-gray-400">
-                    Loading FXRP price feed…
-                  </p>
+                  <div className="h-40 flex flex-col items-center justify-center text-xs text-gray-500 gap-2">
+                    <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                    Loading FXRP oracle feed...
+                  </div>
                 ) : (
-                  <svg viewBox="0 0 300 100" className="w-full h-32">
-                    <rect x="0" y="0" width="300" height="100" fill="#020617" />
-                    {(() => {
-                      const ps = prices;
-                      const min = Math.min(...ps.map((x) => x.p));
-                      const max = Math.max(...ps.map((x) => x.p));
-                      const range = max - min || 1;
-                      const path = ps
-                        .map((pt, i) => {
-                          const x = (i / (ps.length - 1)) * 300;
-                          const y = 100 - ((pt.p - min) / range) * 80 - 10;
-                          return `${i === 0 ? 'M' : 'L'}${x},${y}`;
-                        })
-                        .join(' ');
-                      return (
-                        <path
-                          d={path}
-                          fill="none"
-                          stroke="#38bdf8"
-                          strokeWidth="2"
-                          strokeLinejoin="round"
-                          strokeLinecap="round"
-                        />
-                      );
-                    })()}
-                  </svg>
+                  <div className="animate-in fade-in duration-500">
+                    <div className="flex justify-between text-[10px] text-gray-500 mb-2 px-1 font-mono">
+                      <span>HIGH: {Math.max(...prices.map((p) => p.p)).toFixed(4)}</span>
+                      <span>LOW: {Math.min(...prices.map((p) => p.p)).toFixed(4)}</span>
+                    </div>
+
+                    <svg viewBox="0 0 300 100" className="w-full h-40 mb-2 touch-none">
+                      <line x1="0" y1="20" x2="300" y2="20" stroke="#1e293b" strokeWidth="0.5" strokeDasharray="4 2" />
+                      <line x1="0" y1="50" x2="300" y2="50" stroke="#1e293b" strokeWidth="0.5" strokeDasharray="4 2" />
+                      <line x1="0" y1="80" x2="300" y2="80" stroke="#1e293b" strokeWidth="0.5" strokeDasharray="4 2" />
+                      {(() => {
+                        const ps = prices;
+                        const min = Math.min(...ps.map((x) => x.p));
+                        const max = Math.max(...ps.map((x) => x.p));
+                        const range = max - min || 0.0001;
+                        const path = ps
+                          .map((pt, i) => {
+                            const x = (i / (ps.length - 1)) * 300;
+                            const y = 90 - ((pt.p - min) / range) * 80;
+                            return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+                          })
+                          .join(' ');
+                        return (
+                          <path
+                            d={path}
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth="2"
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                            className="drop-shadow-[0_0_8px_rgba(56,189,248,0.4)]"
+                          />
+                        );
+                      })()}
+                    </svg>
+
+                    <div className="flex justify-between text-[10px] text-gray-500 px-1 font-mono">
+                      <span>
+                        {new Date(prices[0].t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-emerald-400">Live: ${prices[prices.length - 1].p.toFixed(4)}</span>
+                      </div>
+                      <span>
+                        {new Date(prices[prices.length - 1].t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
                 )}
-                <p className="mt-1 text-[10px] text-gray-500">
-                  FXRP price via oracle consumer; risk level based on recent volatility.
-                </p>
               </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-3">
-                <div>
-                  <span className="text-xs text-gray-400">
-                    Market
-                  </span>
-                  <div className="text-base font-medium">
-                    mockFXRP / FXRP
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    Current price: {fxrpPrice.toFixed(4)} USD
+            <div className="grid md:grid-cols-2 gap-6 text-sm">
+              <div className="space-y-4">
+                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800">
+                  <span className="text-xs text-gray-400 block mb-1">Market Pair</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-base font-medium text-white">mockFXRP / USD</span>
+                    <span className="text-xs text-gray-400 font-mono">
+                      Oracle Price: {fxrpPrice.toFixed(4)} USD
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 p-1 bg-slate-900 rounded-lg border border-slate-800">
                   <button
                     onClick={() => setSide('long')}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold ${side === 'long'
-                        ? 'bg-emerald-500 text-black'
-                        : 'bg-slate-800 text-slate-200'
+                    className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${side === 'long'
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
+                        : 'text-slate-400 hover:text-white'
                       }`}
                   >
-                    Long
+                    LONG
                   </button>
                   <button
                     onClick={() => setSide('short')}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold ${side === 'short'
-                        ? 'bg-rose-500 text-black'
-                        : 'bg-slate-800 text-slate-200'
+                    className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${side === 'short'
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/20'
+                        : 'text-slate-400 hover:text-white'
                       }`}
                   >
-                    Short
+                    SHORT
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-300 mb-1">
-                    Position size (mockFXRP)
+                  <label className="block text-xs text-gray-400 mb-2 ml-1">
+                    Position Size (mockFXRP)
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={sizeInput}
-                    onChange={(e) => setSizeInput(e.target.value)}
-                    className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-xs outline-none focus:border-sky-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={sizeInput}
+                      onChange={(e) => setSizeInput(e.target.value)}
+                      className="w-full rounded-lg bg-slate-900 border border-slate-700 px-4 py-3 text-sm text-white outline-none focus:border-sky-500 transition-colors placeholder-slate-600"
+                      placeholder="0.00"
+                    />
+                    <span className="absolute right-4 top-3 text-xs text-slate-500">FXRP</span>
+                  </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <button
                     onClick={handleOpen}
                     disabled={!canOpen}
-                    className="flex-1 rounded-lg bg-sky-600 hover:bg-sky-500 py-2 text-xs font-semibold disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-sky-600 hover:bg-sky-500 py-3 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-sky-900/20"
                   >
-                    Open position
+                    Open Trade
                   </button>
                   <button
                     onClick={handleClose}
                     disabled={!canClose}
-                    className="flex-1 rounded-lg bg-slate-800 hover:bg-slate-700 py-2 text-xs font-semibold disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-slate-800 hover:bg-slate-700 py-3 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    Close position
+                    Close Trade
                   </button>
                 </div>
               </div>
 
-              <div className="border border-slate-800 rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Status</span>
-                  <span className="font-semibold">
-                    {entryPrice === null ? 'No open position' : 'Open'}
-                  </span>
+              <div className="border border-slate-800 bg-slate-900/50 rounded-xl p-5 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 pb-2 border-b border-slate-800">
+                    Position Summary
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Status</span>
+                      <span className={`font-mono font-semibold px-2 py-0.5 rounded ${entryPrice !== null ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-800 text-slate-400'}`}>
+                        {entryPrice === null ? 'CLOSED' : 'OPEN'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Entry Price</span>
+                      <span className="font-mono text-slate-200">
+                        {entryPrice === null
+                          ? '-'
+                          : entryPrice.toFixed(4) + ' USD'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Mark Price</span>
+                      <span className="font-mono text-slate-200">{currentPrice.toFixed(4)} USD</span>
+                    </div>
+                    <div className="flex justify-between text-xs pt-2 border-t border-slate-800/50">
+                      <span className="text-gray-400">Unrealized PnL</span>
+                      <span
+                        className={`font-mono font-bold ${currentPnl > 0
+                            ? 'text-emerald-400'
+                            : currentPnl < 0
+                              ? 'text-rose-400'
+                              : 'text-slate-500'
+                          }`}
+                      >
+                        {currentPnl > 0 ? '+' : ''}{currentPnl.toFixed(4)} FXRP
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Entry price</span>
-                  <span>
-                    {entryPrice === null
-                      ? '-'
-                      : entryPrice.toFixed(4) + ' USD'}
-                  </span>
+
+                <div className="bg-sky-900/10 rounded-lg p-3 mt-4 border border-sky-900/20">
+                  <p className="text-[10px] text-sky-400/80 leading-relaxed text-center">
+                    <span className="font-bold">AI Risk Guard:</span> Trading disabled if volatility exceeds 2.0% (Risk: HIGH).
+                  </p>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Current price</span>
-                  <span>{currentPrice.toFixed(4)} USD</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Unrealized PnL</span>
-                  <span
-                    className={
-                      currentPnl > 0
-                        ? 'text-emerald-400'
-                        : currentPnl < 0
-                          ? 'text-rose-400'
-                          : 'text-slate-100'
-                    }
-                  >
-                    {currentPnl.toFixed(4)} FXRP
-                  </span>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2">
-                  In the full version, this panel will add AI-based risk checks
-                  before opening trades and display lender/protocol profit share.
-                </p>
               </div>
             </div>
           </div>
