@@ -156,6 +156,6 @@ Built for the **Flare Hackathon**.
 
 *RippleLens AI demonstrates that DeFi doesn't have to be dangerous. By combining the transparency of blockchain with the intelligence of AI, we make finance safer for everyone.*
 
-ppt link : https://docs.google.com/presentation/d/1wbVSz61f4J6gW7bxt_q_GHdJKGxGie4giKNHdtxt2xI/edit?usp=sharing
+presentation link : https://docs.google.com/presentation/d/1wbVSz61f4J6gW7bxt_q_GHdJKGxGie4giKNHdtxt2xI/edit?usp=sharing
 
 demo video link : https://drive.google.com/file/d/1xFm4uIJ6My4-s--k8KxN8t8MWtPF2MMC/view?usp=sharing
