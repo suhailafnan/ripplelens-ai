@@ -1,0 +1,8 @@
+export const FXRP_TOKEN_ADDRESS =
+    "0xa7234f78c1fBD8b7d048c8aFF132fbefB28D9672"; // MockFXRP on C2FLR [web:1]
+
+export const REPUTATION_ORACLE_ADDRESS =
+    "0x04b72e955440544E0c0058AC8d5DAAB9BbF9E7B7"; // ReputationOracle on C2FLR [web:2]
+
+export const LENDING_POOL_ADDRESS =
+    "0xf35dCC5855B2876473c10b244d4f1dBCeBA23092"; // FxrpLendingPool on C2FLR [web:3]

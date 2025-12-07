@@ -2,22 +2,26 @@
 import { defineChain } from 'viem';
 
 export const c2flr = defineChain({
-    id: 114, // <-- replace with actual C2FLR chainId
-    name: 'C2FLR Testnet',
-    network: 'c2flr',
+    id: 114,
+    name: 'Flare Testnet Coston2',
+    network: 'coston2',
     nativeCurrency: {
-        name: 'Flare Testnet',
+        name: 'C2FLR',
         symbol: 'C2FLR',
         decimals: 18,
     },
     rpcUrls: {
-        default: { http: ['https://c2.flare.network'] }, // use real RPC
-        public: { http: ['https://c2.flare.network'] },
+        default: {
+            http: ['https://coston2-api.flare.network/ext/C/rpc'],
+        },
+        public: {
+            http: ['https://coston2-api.flare.network/ext/C/rpc'],
+        },
     },
     blockExplorers: {
         default: {
-            name: 'C2FLR Explorer',
-            url: 'https://c2-explorer.flare.network', // use real explorer URL
+            name: 'Coston2 Explorer',
+            url: 'https://coston2-explorer.flare.network',
         },
     },
 });
